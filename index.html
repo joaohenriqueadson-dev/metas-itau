@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Organizador de Metas Trimestrais</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--ink:#14213d;--mut:#5d6783;--line:#dde1ea;--acc:#ec7000;--blue:#0a2a7a;--ok:#1b8a4b;--warn:#c98a00;--bad:#c62f2f}
+@media(prefers-color-scheme:dark){:root:not([data-t=l]){--bg:#0e1424;--card:#172038;--ink:#eef1f8;--mut:#9aa5c4;--line:#2a3558;--blue:#7f9cff}}
+:root[data-t=d]{--bg:#0e1424;--card:#172038;--ink:#eef1f8;--mut:#9aa5c4;--line:#2a3558;--blue:#7f9cff}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 "Segoe UI",system-ui,sans-serif;padding:0 0 76px}
+header{padding:14px 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:18px;margin:0}h2{font-size:16px;margin:0 0 8px}
+main{max-width:900px;margin:auto;padding:0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}.row>*{flex:1 1 120px}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
+input,select,textarea,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px;width:100%}
+button{cursor:pointer;width:auto;background:var(--acc);color:#fff;border:0;font-weight:600}
+button.g{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.x{background:transparent;color:var(--bad);padding:4px 8px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0)}
+nav button{flex:1;background:none;color:var(--mut);border-radius:0;padding:14px 4px}
+nav button.on{color:var(--acc);box-shadow:inset 0 3px var(--acc)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
+.kv b{display:block;font-size:17px}.kv span{font-size:12px;color:var(--mut)}
+.bar{height:8px;background:var(--line);border-radius:5px;overflow:hidden;margin-top:10px}.bar i{display:block;height:100%}
+.tag{font-size:12px;padding:2px 8px;border-radius:9px;color:#fff;white-space:nowrap}
+.s-Aprovada{background:var(--blue)}.s-Debitada{background:var(--ok)}.s-Recusada,.s-Nao{background:var(--bad)}.s-Analise{background:var(--warn)}
+.wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+td,th{padding:6px;border-bottom:1px solid var(--line);text-align:left}
+.hid{display:none}small{color:var(--mut)}
+</style>
+</head>
+<body>
+<header><h1>Metas trimestrais</h1><button class="g" id="tema">Tema</button></header>
+<main>
+<section id="p-metas"></section>
+<section id="p-prod" class="hid"></section>
+<section id="p-conf" class="hid"></section>
+<p><small>Ferramenta de controle pessoal. Não substitui os sistemas oficiais do banco. Não registre dados sensíveis de clientes além do necessário.</small></p>
+</main>
+<nav><button data-p="metas" class="on">Metas</button><button data-p="prod">Produções</button><button data-p="conf">Ajustes</button></nav>
+<script>
+const GR={eq:"Equilíbrio de contas",re:"Renegociação",pr:"Produtos",cb:"Benefícios e relacionamento",en:"Engajamento"};
+const UN={eq:"R$",re:"R$",pr:"R$",cb:"pts",en:"pts"};
+// id, grade, nome, tipo (v=valor, p=pontos), fator padrão, temTroco
+const PD=[
+["inss","eq","Consignado INSS","v",2.5],["inssp","eq","Consignado INSS + prestamista","v",3],
+["port","eq","Portabilidade INSS (valor portado + troco)","v",3,2.5],
+["vei","eq","Financiamento de veículo","v",3],["veip","eq","Financiamento de veículo + prestamista","v",3.5],
+["con","eq","Consórcio","v",3],["conp","eq","Consórcio + prestamista","v",3.5],
+["che","eq","Cheque especial","v",1],
+["r1","re","Dívida 15 a 90 dias","v",1.5],["r2","re","Dívida 90 a 180 dias","v",1.2],["r3","re","Dívida 180 a 365 dias","v",1],
+["sv","pr","Seguro de vida","v",3],["sa","pr","Seguro de automóvel","v",2],["st","pr","Seguro transação","v",4],["sr","pr","Seguro residencial","v",2],
+["c2","cb","Combinaqui 2 pontos","p",2],["c3","cb","Combinaqui 3 pontos","p",3],["c4","cb","Combinaqui 4 pontos","p",4],
+["ca","en","Cartão com anuidade","p",3],["cs","en","Cartão sem anuidade","p",2],["at","en","Ativação de cartão","p",1],["vi","en","Vinculação INSS","p",3]
+].map(a=>({id:a[0],g:a[1],n:a[2],t:a[3],f:a[4],tr:a[5]}));
+const ST=["Em análise","Aprovada","Debitada","Não debitada","Recusada"];
+const stc=s=>({"Em análise":"Analise","Aprovada":"Aprovada","Debitada":"Debitada","Não debitada":"Nao","Recusada":"Recusada"}[s]);
+const hoje=new Date();
+let S={y:hoje.getFullYear(),q:Math.floor(hoje.getMonth()/3)+1,metas:{},manual:{},fat:{},ex:"",pend:false,ops:[],tema:""};
+try{const r=localStorage.getItem("metas-v1");if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+const save=()=>{try{localStorage.setItem("metas-v1",JSON.stringify(S))}catch(e){}};
+const esc=t=>String(t??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=(n,u)=>u==="pts"?Math.round(n).toLocaleString("pt-BR")+" pts":n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const fator=p=>S.fat[p.id]??p.f;
+const fatTroco=p=>S.fat[p.id+"_t"]??p.tr;
+const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+function pascoa(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;return new Date(y,mes-1,dia)}
+function feriados(y){const p=pascoa(y),add=n=>{const d=new Date(p);d.setDate(d.getDate()+n);return iso(d)};
+const s=new Set(["01-01","04-21","05-01","09-07","10-12","11-02","11-15","11-20","12-25"].map(x=>y+"-"+x));
+[-48,-47,-2,60].forEach(n=>s.add(add(n)));
+(S.ex||"").split(/[\s,;]+/).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).forEach(x=>s.add(x));return s}
+function diasUteis(ini,fim){if(fim<ini)return 0;const f=feriados(ini.getFullYear());let n=0;for(let d=new Date(ini);d<=fim;d.setDate(d.getDate()+1)){const w=d.getDay();if(w&&w<6&&!f.has(iso(d)))n++}return n}
+function tri(){const i=new Date(S.y,(S.q-1)*3,1),f=new Date(S.y,S.q*3,0);return{i,f}}
+const noTri=o=>{const d=new Date(o.data+"T12:00:00"),{i,f}=tri();return d>=i&&d<=new Date(f.getFullYear(),f.getMonth(),f.getDate(),23,59)};
+const conta=o=>["Aprovada","Debitada"].includes(o.st)||(S.pend&&o.st==="Em análise");
+function render(){
+const {i,f}=tri(),t0=new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate());
+const total=diasUteis(i,f),rest=t0>f?0:diasUteis(t0<i?i:t0,f),dec=total-rest;
+const ops=S.ops.filter(noTri);
+// METAS
+let h=`<div class="card"><div class="row"><div><label>Ano</label><input id="y" type="number" value="${S.y}"></div><div><label>Trimestre</label><select id="q">${[1,2,3,4].map(n=>`<option value="${n}" ${n==S.q?"selected":""}>${n}º trimestre</option>`).join("")}</select></div><div><label><input type="checkbox" id="pend" ${S.pend?"checked":""} style="width:auto"> Contar "Em análise"</label></div></div>
+<div class="kv"><div><b>${total}</b><span>dias úteis no trimestre</span></div><div><b>${dec}</b><span>já decorridos</span></div><div><b>${rest}</b><span>restantes (hoje incluso)</span></div></div></div>`;
+for(const g in GR){
+const meta=+S.metas[g]||0,man=+S.manual[g]||0,u=UN[g];
+const prod=ops.filter(o=>o.g===g&&conta(o)).reduce((a,o)=>a+o.pond,0)+man;
+const pot=ops.filter(o=>o.g===g&&o.st==="Em análise").reduce((a,o)=>a+o.pond,0);
+const falta=Math.max(meta-prod,0),pct=meta?Math.min(prod/meta*100,100):0,dia=rest?falta/rest:falta;
+const esp=total?dec/total:0,cor=!meta?"var(--line)":prod>=meta*esp?"var(--ok)":prod>=meta*esp*.8?"var(--warn)":"var(--bad)";
+h+=`<div class="card"><h2>${GR[g]}</h2><div class="row"><div><label>Meta do trimestre (${u})</label><input type="number" min="0" step="any" data-m="${g}" value="${S.metas[g]??""}"></div><div><label>Ajuste manual de produzido (${u})</label><input type="number" step="any" data-a="${g}" value="${S.manual[g]??""}"></div></div>
+<div class="kv"><div><b>${fmt(prod,u)}</b><span>produzido</span></div><div><b>${fmt(falta,u)}</b><span>falta</span></div><div><b>${fmt(dia,u)}</b><span>necessário por dia útil</span></div><div><b>${pct.toFixed(0)}%</b><span>atingido</span></div></div>
+<div class="bar"><i style="width:${pct}%;background:${cor}"></i></div>${pot?`<small>+ ${fmt(pot,u)} ainda em análise</small>`:""}</div>`}
+q("#p-metas").innerHTML=h;
+// PRODUÇÕES
+const f2=window.F||{};
+const lista=S.ops.filter(noTri).filter(o=>(!f2.g||o.g===f2.g)&&(!f2.s||o.st===f2.s)&&(!f2.b||(o.ag+o.cc).includes(f2.b))).sort((a,b)=>b.data.localeCompare(a.data));
+const sum={};ST.forEach(s=>sum[s]=0);ops.forEach(o=>sum[o.st]+=o.pond);
+q("#p-prod").innerHTML=`<div class="card"><h2>Nova operação</h2><div class="row"><div><label>Data</label><input type="date" id="d" value="${iso(hoje)}"></div><div><label>Agência</label><input id="ag" inputmode="numeric" maxlength="6"></div><div><label>Conta</label><input id="cc" inputmode="numeric" maxlength="12"></div></div>
+<div class="row" style="margin-top:8px"><div><label>Produto</label><select id="pd">${PD.map(p=>`<option value="${p.id}">${GR[p.g]}: ${p.n}</option>`).join("")}</select></div><div><label id="l1">Valor</label><input id="v1" type="number" min="0" step="any"></div><div id="bt" class="hid"><label>Troco (se houver)</label><input id="v2" type="number" min="0" step="any"></div><div><label>Status</label><select id="st">${ST.map(s=>`<option>${s}</option>`).join("")}</select></div></div>
+<div class="row" style="margin-top:8px"><div><label>Valor ponderado (editável)</label><input id="po" type="number" step="any"></div><div><label>Observação</label><input id="ob"></div><div><button id="add">Salvar operação</button></div></div><small id="er" style="color:var(--bad)"></small></div>
+<div class="card"><div class="kv">${ST.map(s=>`<div><b>${sum[s].toLocaleString("pt-BR",{maximumFractionDigits:0})}</b><span>${s}</span></div>`).join("")}</div><small>Em análise e Aprovada ainda não debitada são pendências de realização.</small></div>
+<div class="card"><div class="row"><div><label>Grade</label><select id="fg"><option value="">Todas</option>${Object.entries(GR).map(([k,v])=>`<option value="${k}" ${f2.g===k?"selected":""}>${v}</option>`).join("")}</select></div><div><label>Status</label><select id="fs"><option value="">Todos</option>${ST.map(s=>`<option ${f2.s===s?"selected":""}>${s}</option>`).join("")}</select></div><div><label>Buscar agência/conta</label><input id="fb" value="${esc(f2.b||"")}"></div></div>
+<div class="wrap" style="margin-top:8px"><table><tr><th>Data</th><th>Ag.</th><th>Conta</th><th>Produto</th><th>Ponderado</th><th>Status</th><th></th></tr>${lista.map(o=>`<tr><td>${o.data.split("-").reverse().join("/")}</td><td>${esc(o.ag)}</td><td>•••${esc(String(o.cc).slice(-3))}</td><td>${esc(o.pn)}<br><small>${esc(o.ob)}</small></td><td>${o.pond.toLocaleString("pt-BR",{maximumFractionDigits:2})}</td><td><select data-st="${o.id}">${ST.map(s=>`<option ${s===o.st?"selected":""}>${s}</option>`).join("")}</select></td><td><button class="x" data-del="${o.id}" aria-label="Excluir">✕</button></td></tr>`).join("")||`<tr><td colspan="7">Nenhuma operação neste trimestre. Preencha o formulário acima.</td></tr>`}</table></div></div>`;
+// AJUSTES
+q("#p-conf").innerHTML=`<div class="card"><h2>Ponderadores</h2><small>Altere se a política mudar. Pontos: valor por unidade.</small>${PD.map(p=>`<div class="row" style="margin-top:6px"><div style="flex:2 1 180px">${esc(p.n)}</div><div><input type="number" step="any" data-f="${p.id}" value="${fator(p)}" aria-label="${esc(p.n)}"></div>${p.tr?`<div><input type="number" step="any" data-f="${p.id}_t" value="${fatTroco(p)}" aria-label="Troco"></div>`:""}</div>`).join("")}</div>
+<div class="card"><h2>Feriados extras</h2><small>Datas AAAA-MM-DD separadas por vírgula (ex.: ponto facultativo). Feriados nacionais já estão incluídos.</small><textarea id="ex" rows="2">${esc(S.ex)}</textarea></div>
+<div class="card"><h2>Dados</h2><div class="row"><button id="exp">Exportar JSON</button><button class="g" id="imp">Importar JSON</button><button class="g" id="lim">Apagar tudo</button></div><input type="file" id="fi" accept=".json" class="hid"></div>`;
+bind();calc()}
+const q=s=>document.querySelector(s);
+function calc(){const p=PD.find(x=>x.id===q("#pd")?.value);if(!p)return;q("#l1").textContent=p.t==="p"?"Quantidade":p.tr?"Valor portado (R$)":"Valor da operação (R$)";q("#bt").classList.toggle("hid",!p.tr);
+const v=(+q("#v1").value||0)*fator(p)+(p.tr?(+q("#v2").value||0)*fatTroco(p):0);q("#po").value=v?+v.toFixed(2):""}
+function bind(){
+const on=(s,e,fn)=>document.querySelectorAll(s).forEach(x=>x.addEventListener(e,fn));
+on("#y","change",e=>{S.y=+e.target.value||S.y;save();render()});on("#q","change",e=>{S.q=+e.target.value;save();render()});
+on("#pend","change",e=>{S.pend=e.target.checked;save();render()});
+on("[data-m]","change",e=>{S.metas[e.target.dataset.m]=e.target.value;save();render()});
+on("[data-a]","change",e=>{S.manual[e.target.dataset.a]=e.target.value;save();render()});
+on("#pd,#v1,#v2","input",calc);
+q("#add").onclick=()=>{const p=PD.find(x=>x.id===q("#pd").value),ag=q("#ag").value.trim(),cc=q("#cc").value.trim(),pond=+q("#po").value;
+if(!/^\d{1,6}$/.test(ag)||!/^\d{1,12}$/.test(cc)){q("#er").textContent="Informe agência e conta usando só números.";return}
+if(!(pond>0)){q("#er").textContent="Informe o valor da operação para calcular o ponderado.";return}
+S.ops.push({id:Date.now(),data:q("#d").value,ag,cc,g:p.g,pid:p.id,pn:p.n,pond,st:q("#st").value,ob:q("#ob").value});save();render();q("#p-prod").classList.remove("hid")};
+on("[data-st]","change",e=>{S.ops.find(o=>o.id==e.target.dataset.st).st=e.target.value;save();render()});
+on("[data-del]","click",e=>{if(confirm("Excluir esta operação?")){S.ops=S.ops.filter(o=>o.id!=e.target.dataset.del);save();render()}});
+const fl=()=>{window.F={g:q("#fg").value,s:q("#fs").value,b:q("#fb").value.trim()};render()};on("#fg,#fs","change",fl);on("#fb","change",fl);
+on("[data-f]","change",e=>{S.fat[e.target.dataset.f]=+e.target.value;save()});
+on("#ex","change",e=>{S.ex=e.target.value;save();render()});
+q("#exp").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(S)],{type:"application/json"}));a.download="metas-backup.json";a.click()};
+q("#imp").onclick=()=>q("#fi").click();
+q("#fi").onchange=e=>{const r=new FileReader();r.onload=()=>{try{S=Object.assign(S,JSON.parse(r.result));save();render()}catch(x){alert("Arquivo inválido.")}};r.readAsText(e.target.files[0])};
+q("#lim").onclick=()=>{if(confirm("Apagar todos os dados deste aparelho?")){try{localStorage.removeItem("metas-v1")}catch(e){}location.reload()}}}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x===b));["metas","prod","conf"].forEach(p=>q("#p-"+p).classList.toggle("hid",p!==b.dataset.p))});
+q("#tema").onclick=()=>{S.tema=S.tema==="d"?"l":"d";document.documentElement.dataset.t=S.tema;save()};
+if(S.tema)document.documentElement.dataset.t=S.tema;
+render();
+</script>
+</body>
+</html>
